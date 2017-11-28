@@ -1,0 +1,6 @@
+---
+applications:
+- name: hystrix-redis
+  memory: 768M
+  instances: 1
+  path: target/hystrix-redis-poc-1.0-SNAPSHOT.war
