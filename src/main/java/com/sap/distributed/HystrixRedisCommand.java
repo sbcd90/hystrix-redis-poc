@@ -15,6 +15,7 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class HystrixRedisCommand extends HystrixCommand<List<Product>> {
@@ -30,6 +31,20 @@ public class HystrixRedisCommand extends HystrixCommand<List<Product>> {
   protected List<Product> run() throws Exception {
     if (num == 1) {
       try {
+        String vcap_services = System.getenv("VCAP_SERVICES");
+        JsonNode node = new ObjectMapper().readTree(vcap_services);
+
+        String password = "";
+        String redisNodeHost = "";
+        String redisNodePort = "";
+        if (node.get("redis").isArray()) {
+          JsonNode credentials = node.get("redis").get(0).get("credentials");
+          password = credentials.get("password").asText();
+
+          JsonNode redisNode = credentials.get("redis_nodes").get(0);
+          redisNodeHost = redisNode.get("hostname").asText();
+          redisNodePort = redisNode.get("port").asText();
+        }
         Client client = ClientBuilder.newClient();
 
         WebTarget webTarget =
@@ -59,12 +74,13 @@ public class HystrixRedisCommand extends HystrixCommand<List<Product>> {
           }
         }
 
-        Jedis jedis = new Jedis("localhost", 6379);
+        Jedis jedis = new Jedis(redisNodeHost, Integer.valueOf(redisNodePort));
+        jedis.auth(password);
         jedis.set("products", new ObjectMapper().writeValueAsString(products));
         return products;
       } catch (Exception ex) {
         ex.printStackTrace();
-        throw ex;
+        return Arrays.asList();
       }
     } else {
       throw new RuntimeException("Throw exception");
@@ -74,7 +90,22 @@ public class HystrixRedisCommand extends HystrixCommand<List<Product>> {
   @Override
   protected List<Product> getFallback() {
     try {
-      Jedis jedis = new Jedis("localhost", 6379);
+      String vcap_services = System.getenv("VCAP_SERVICES");
+      JsonNode node = new ObjectMapper().readTree(vcap_services);
+
+      String password = "";
+      String redisNodeHost = "";
+      String redisNodePort = "";
+      if (node.get("redis").isArray()) {
+        JsonNode credentials = node.get("redis").get(0).get("credentials");
+        password = credentials.get("password").asText();
+
+        JsonNode redisNode = credentials.get("redis_nodes").get(0);
+        redisNodeHost = redisNode.get("hostname").asText();
+        redisNodePort = redisNode.get("port").asText();
+      }
+      Jedis jedis = new Jedis(redisNodeHost, Integer.valueOf(redisNodePort));
+      jedis.auth(password);
       String response = jedis.get("products");
       return new ObjectMapper().readValue(response, new TypeReference<List<Product>>() {
       });
