@@ -40,12 +40,11 @@ public class SimpleCollapsingCommand extends HystrixCollapser<List<Pair<Ticker, 
                                        Collection<CollapsedRequest<StockPrice, Ticker>> collection) {
     collection.forEach(request -> {
       Ticker ticker = request.getArgument();
-      StockPrice stockPrice = null;
-      for (Pair<Ticker, StockPrice> price: pairs) {
-        if (price.getKey().getSymbol().equals(ticker.getSymbol())) {
-          stockPrice = price.getValue();
-        }
-      }
+      StockPrice stockPrice = pairs.stream()
+                                .filter(pricePair -> pricePair.getKey().getSymbol().equals(ticker.getSymbol()))
+                                .map(Pair::getValue)
+                                .collect(Collectors.toList())
+                                .get(0);
       request.setResponse(stockPrice);
     });
   }
